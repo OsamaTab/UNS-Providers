@@ -1,6 +1,7 @@
 [
     {
         "id": "annas",
+        "name": "Anna's Archive",
         "version": "1.0.0",
         "beta":true,
         "icon": "https://annas-archive.gl/favicon.ico"
