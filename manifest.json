@@ -1,4 +1,56 @@
 [
-  { "id": "allnovel", "version": "1.0.0", "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png" },
-  { "id": "novelfull", "version": "1.0.0", "icon": "https://novelfull.com/uploads/thumbs/banner-75b2b7a774-bf0efeba81-e12fa8e3e6dd74587f2bc6ada7256742.png" }
+    {
+        "id": "allnovel",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "freewebnovel",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "hiraethtranslation",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "libread",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "novelbin",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "novelfull",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "pawread",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "readfromnet",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    },
+    {
+        "id": "royalroad",
+        "version": "1.0.0",
+        "beta": true,
+        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+    }
 ]
