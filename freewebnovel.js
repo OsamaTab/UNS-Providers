@@ -1,10 +1,38 @@
 module.exports = {
     id: 'freewebnovel',
     name: 'FreeWebNovel',
-    version: '1.0.1', // Remember to update this to trigger the 'Update' button!
+    version: '1.1.0',
     icon: 'https://freewebnovel.com/static/freewebnovel/images/logo.png',
-    getPopularUrl: () => `https://freewebnovel.com/most-popular-novel/`,
-    getSearchUrl: (query) => `https://freewebnovel.com/search?searchkey=${encodeURIComponent(query)}`,
+
+    // 1. Define available categories for this specific site
+    categories: [
+        { id: 'popular', name: 'Most Popular' },
+        { id: 'latestNovel', name: 'Latest Novel' },
+        { id: 'latestRelease', name: 'Latest Releases' },
+        { id: 'completed', name: 'Completed' }
+    ],
+
+    // 2. Map category IDs to their specific URLs, supporting pagination
+    getCategoryUrl: (categoryId, page = 1) => {
+        const baseUrl = 'https://freewebnovel.com';
+        
+        // FreeWebNovel typically uses paths like /most-popular-novel/ 
+        // and /most-popular-novel/2.html for pagination
+        const pageSuffix = page > 1 ? `${page}.html` : '';
+
+        switch (categoryId) {
+            case 'popular': return `${baseUrl}/sort/most-popular/${pageSuffix}`;
+            case 'latestNovel': return `${baseUrl}/sort/latest-novel/${pageSuffix}`;
+            case 'latestRelease': return `${baseUrl}/sort/latest-release/${pageSuffix}`;
+            case 'completed': return `${baseUrl}/sort/completed-novel/${pageSuffix}`;
+            default: return `${baseUrl}/sort/most-popular/${pageSuffix}`;
+        }
+    },
+
+    // Handle pagination for search results if applicable
+    getSearchUrl: (query, page = 1) => {
+        return `https://freewebnovel.com/search?searchkey=${encodeURIComponent(query)}${page > 1 ? '&page=' + page : ''}`;
+    },
 
     getNovelDetailsScript: () => `
     (() => {
@@ -40,7 +68,8 @@ module.exports = {
         };
     })();`,
 
-    getSearchScript: () => `
+    // 3. Rename to getListScript as it handles both search results and category lists
+    getListScript: () => `
     (() => {
         const results = [];
         const rows = document.querySelectorAll('.li-row, .item');
