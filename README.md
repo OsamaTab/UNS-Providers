@@ -57,7 +57,6 @@ Strings that are IIFEs returning data:
 - `getListScript`: Parse search results.
 - `getNovelDetailsScript`: Parse book or novel details.
 - `getFileInfoScript`: Parse file info.
-- `getDownloadLinkScript`: Get download URL.
 
 Use `document.querySelectorAll` to extract data.
 

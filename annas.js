@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.2.5',
+  version: '1.2.6',
   icon: 'https://annas-archive.gl/favicon.ico',
   categories: [
     { id: 'recent', name: 'Recent' },
@@ -29,93 +29,101 @@ module.exports = {
 
     getNovelDetailsScript: () => `
         (() => {
-        // Get title - from the font-semibold text-2xl div
-        const titleEl = document.querySelector('.font-semibold.text-2xl');
-        const title = titleEl ? titleEl.innerText.trim().replace('🔍', '').trim() : '';
-        
-        // Get author - from the user-edit icon link
-        const authorEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--user-edit]');
-        let author = 'Unknown';
-        if (authorEl) {
-            const authorLink = authorEl.closest('a');
-            if (authorLink) {
-            author = authorLink.innerText.trim();
-            }
-        }
-        
-        // Get publisher/year - from the company icon link
-        const publisherEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--company]');
-        let publisher = '';
-        if (publisherEl) {
-            const publisherLink = publisherEl.closest('a');
-            if (publisherLink) {
-            // Extract just the publisher name (first part before comma)
-            const fullText = publisherLink.innerText.trim();
-            publisher = fullText.split(',')[0].trim();
-            }
-        }
-        
-        // Get description - from js-md5-top-box-description
-        const descEl = document.querySelector('.js-md5-top-box-description');
-        let description = '';
-        if (descEl) {
-            const lines = Array.from(descEl.querySelectorAll('div')).map(div => div.innerText.trim());
-            description = lines.filter(line => line.length > 0).join('\\n');
-        }
-        
-        // Get metadata line (English, EPUB, size, year)
-        const metadataEl = document.querySelector('.text-gray-800.dark\\\\:text-slate-400');
-        const metadata = metadataEl ? metadataEl.innerText.trim() : '';
-        
-        // Get all file info from codes tabs
-        const codeTabs = document.querySelectorAll('.js-md5-codes-tabs-tab');
-        const allFormats = Array.from(codeTabs).map(tab => {
-            const type = tab.querySelector('span:first-child')?.innerText || '';
-            const value = tab.querySelector('span:last-child')?.innerText || '';
-            return {
-            title: type + ': ' + value.substring(0, 50),
-            url: window.location.href + '#' + tab.id
-            };
-        }).filter(item => item.title.length > 0);
-        
-        // Get cover image if available
-        let cover = null;
-        // Fix: Use attribute starts-with selector instead of regex pattern
-        const coverContainer = document.querySelector('div[id^="cover_aarecord_id__md5:"]');
-        if (coverContainer) {
-            const coverImg = coverContainer.querySelector('img');
-            if (coverImg) {
-            cover = coverImg.getAttribute('data-src') || coverImg.src;
-            if (cover && cover.startsWith('/')) {
-                cover = 'https://annas-archive.gl' + cover;
-            }
-            }
-        }
-        
-        // Fallback: try list cover container
-        if (!cover) {
-            const listCoverContainer = document.querySelector('div[id^="list_cover_aarecord_id__md5:"]');
-            if (listCoverContainer) {
-            const listCoverImg = listCoverContainer.querySelector('img');
-            if (listCoverImg) {
-                cover = listCoverImg.getAttribute('data-src') || listCoverImg.src;
-                if (cover && cover.startsWith('/')) {
-                cover = 'https://annas-archive.gl' + cover;
+            // --- STEP 1: Link Extraction Logic ---
+            let downloadLink = window.location.href; // Default fallback
+
+            // 1a. Check if we are on the final download page (looking for the span.break-all)
+            const urlSpan = document.querySelector('span.break-all');
+            if (urlSpan && urlSpan.innerText.includes('http')) {
+                downloadLink = urlSpan.innerText.trim();
+            } 
+            // 1b. If not on the final page, look for the "No Waitlist" server link
+            else {
+                const slowLinks = Array.from(document.querySelectorAll('a[href*="/slow_download/"]'));
+                const noWaitlistLink = slowLinks.find(link => 
+                    link.parentElement.textContent.toLowerCase().includes('no waitlist')
+                );
+                if (noWaitlistLink) {
+                    downloadLink = noWaitlistLink.href;
                 }
             }
+
+            // --- STEP 2: Existing Metadata Extraction ---
+            
+            // Get title
+            const titleEl = document.querySelector('.font-semibold.text-2xl');
+            const title = titleEl ? titleEl.innerText.trim().replace('🔍', '').trim() : '';
+            
+            // Get author
+            const authorEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--user-edit]');
+            let author = 'Unknown';
+            if (authorEl) {
+                const authorLink = authorEl.closest('a');
+                if (authorLink) {
+                    author = authorLink.innerText.trim();
+                }
             }
-        }
-        
-        return {
-            title: title,
-            description: description || 'No description available.',
-            author: author,
-            lastChapter: metadata,
-            firstChapterUrl: window.location.href,
-            allChapters: allFormats.slice(0, 50),
-            cover: cover,
-            publisher: publisher
-        };
+            
+            // Get publisher/year
+            const publisherEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--company]');
+            let publisher = '';
+            if (publisherEl) {
+                const publisherLink = publisherEl.closest('a');
+                if (publisherLink) {
+                    const fullText = publisherLink.innerText.trim();
+                    publisher = fullText.split(',')[0].trim();
+                }
+            }
+            
+            // Get description
+            const descEl = document.querySelector('.js-md5-top-box-description');
+            let description = '';
+            if (descEl) {
+                const lines = Array.from(descEl.querySelectorAll('div')).map(div => div.innerText.trim());
+                description = lines.filter(line => line.length > 0).join('\\n');
+            }
+            
+            // Get metadata line
+            const metadataEl = document.querySelector('.text-gray-800.dark\\\\:text-slate-400');
+            const metadata = metadataEl ? metadataEl.innerText.trim() : '';
+            
+            // Get cover image
+            let cover = null;
+            const coverContainer = document.querySelector('div[id^="cover_aarecord_id__md5:"]');
+            if (coverContainer) {
+                const coverImg = coverContainer.querySelector('img');
+                if (coverImg) {
+                    cover = coverImg.getAttribute('data-src') || coverImg.src;
+                    if (cover && cover.startsWith('/')) {
+                        cover = 'https://annas-archive.gl' + cover;
+                    }
+                }
+            }
+            
+            if (!cover) {
+                const listCoverContainer = document.querySelector('div[id^="list_cover_aarecord_id__md5:"]');
+                if (listCoverContainer) {
+                    const listCoverImg = listCoverContainer.querySelector('img');
+                    if (listCoverImg) {
+                        cover = listCoverImg.getAttribute('data-src') || listCoverImg.src;
+                        if (cover && cover.startsWith('/')) {
+                            cover = 'https://annas-archive.gl' + cover;
+                        }
+                    }
+                }
+            }
+
+            // Return the final object
+            return {
+                title: title,
+                description: description || 'No description available.',
+                author: author,
+                lastChapter: metadata,
+                firstChapterUrl: downloadLink,
+                allChapters: [],
+                cover: cover,
+                publisher: publisher
+            };
         })();`,
 
     getListScript: () => `
@@ -206,26 +214,4 @@ module.exports = {
 
         return results;
     })();`,
-
-  getDownloadLinkScript: () => `
-    (() => {
-        // 1. Look for the span that contains the long URL (it usually has the class 'break-all')
-        const urlSpan = document.querySelector('span.break-all');
-        
-        if (urlSpan) {
-            // Get the text content, which is the actual URL
-            const link = urlSpan.textContent.trim();
-            
-            // Basic validation to ensure it's a link
-            if (link.startsWith('http')) {
-                return link;
-            }
-        }
-
-        // 2. Fallback: If for some reason the span isn't there, look for any text containing 'momot.rs'
-        const allSpans = Array.from(document.querySelectorAll('span'));
-        const fallbackLink = allSpans.find(s => s.textContent.includes('momot.rs'));
-        
-        return fallbackLink ? fallbackLink.textContent.trim() : null;
-    })();`
 };
