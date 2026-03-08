@@ -1,5 +1,11 @@
 [
     {
+        "id": "annas",
+        "version": "1.0.0",
+        "beta":true,
+        "icon": "https://annas-archive.gl/favicon.ico"
+    },
+    {
         "id": "allnovel",
         "version": "1.1.2",
         "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
