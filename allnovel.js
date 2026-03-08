@@ -1,10 +1,12 @@
 module.exports = {
     id: 'allnovel',
     name: 'AllNovel',
+    version: '1.0.0',
+    icon: 'https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png',
     getPopularUrl: () => `https://allnovel.org/most-viewed`,
-    
+
     getSearchUrl: (query) => `https://allnovel.org/search?keyword=${encodeURIComponent(query).replace(/%20/g, '+')}`,
-    
+
     getNovelDetailsScript: () => `
     (() => {
         // 1. Get the description
@@ -36,7 +38,7 @@ module.exports = {
             allChapters 
         };
     })();`,
-    
+
     getSearchScript: () => `
     (() => {
         const results = [];
