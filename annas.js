@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.2.1',
+  version: '1.2.2',
   icon: 'https://annas-archive.gl/favicon.ico',
   categories: [
     { id: 'recent', name: 'Recent' },
@@ -27,47 +27,94 @@ module.exports = {
   getListScript: () => `
 (() => {
   const results = [];
-  // Target search result containers more specifically
-  const resultContainers = document.querySelectorAll('a[href*="/md5/"]');
   
-  resultContainers.forEach(link => {
-    // Find the parent container for this result
-    const container = link.closest('div[class*="h-[125px]"], article, .flex.items-start, .js-vim-focus') || link.parentElement;
-    if (!container) return;
+  // Target the actual search result containers: flex divs with border separator
+  const resultContainers = document.querySelectorAll('div.flex[class*="border-b"], div.flex.pt-3');
+  
+  resultContainers.forEach(container => {
+    // Find the main link that contains both cover and title (href contains /md5/)
+    const mainLink = container.querySelector('a[href*="/md5/"]');
+    if (!mainLink) return;
     
-    // Get title from the link
-    const title = link.innerText.trim();
-    if (!title) return;
+    // Get title from the link text or from the h3/font-semibold element
+    const titleEl = mainLink.querySelector('.js-vim-focus, .font-semibold, .line-clamp-\\[3\\]');
+    const title = titleEl ? titleEl.innerText.trim() : mainLink.innerText.trim().split('\\n')[0];
+    if (!title || title.length < 2) return;
     
-    const url = link.href;
+    const url = mainLink.href.startsWith('http') ? mainLink.href : 'https://annas-archive.gl' + mainLink.href;
     
-    // Get metadata (format, size, language)
-    const metaEl = container.querySelector('.text-gray-500, .text-xs, .text-sm');
-    const metaText = metaEl ? metaEl.innerText.trim() : '';
-    
-    // Get cover image
+    // === COVER IMAGE EXTRACTION (FIXED) ===
     let cover = null;
-    const imgEl = container.querySelector('img');
-    if (imgEl) {
-      cover = imgEl.getAttribute('data-src') || imgEl.getAttribute('src');
-      if (cover && cover.startsWith('/')) {
-        cover = 'https://annas-archive.gl' + cover;
+    
+    // Strategy 1: Look for actual img element inside the cover container
+    const coverContainer = mainLink.querySelector('[id*="list_cover_aarecord_id__md5:"], [id*="cover_aarecord_id__md5:"]');
+    if (coverContainer) {
+      const img = coverContainer.querySelector('img');
+      if (img) {
+        // Get src or data-src, and TRIM whitespace (important!)
+        let src = img.getAttribute('data-src') || img.getAttribute('src') || '';
+        src = src.trim(); // ← Critical fix: removes trailing spaces like "  "
+        if (src && src.startsWith('http')) {
+          cover = src;
+        } else if (src && src.startsWith('/')) {
+          cover = 'https://annas-archive.gl' + src;
+        }
       }
     }
     
-    // Handle fallback cover (no actual image)
+    // Strategy 2: Fallback - search entire container for img if not found yet
+    if (!cover) {
+      const img = container.querySelector('img');
+      if (img) {
+        let src = (img.getAttribute('data-src') || img.getAttribute('src') || '').trim();
+        if (src && src.startsWith('http')) {
+          cover = src;
+        } else if (src && src.startsWith('/')) {
+          cover = 'https://annas-archive.gl' + src;
+        }
+      }
+    }
+    
+    // Strategy 3: Handle fallback cover (no actual image available)
     if (!cover) {
       const fallbackCover = container.querySelector('.js-aarecord-list-fallback-cover');
-      if (fallbackCover) {
-        // No actual image available, keep cover as null
+      if (fallbackCover && !fallbackCover.classList.contains('hidden')) {
+        // No real image exists - keep cover as null, app can show placeholder
         cover = null;
       }
     }
     
+    // === METADATA EXTRACTION ===
+    // Get format/size/language line (gray text below title)
+    const metaEl = container.querySelector('.text-gray-800.dark\\\\:text-slate-400, .text-sm.text-gray-600');
+    const metaText = metaEl ? metaEl.innerText.trim().split('·')[0]?.trim() || metaEl.innerText.trim() : '';
+    
+    // Get author (from user-edit icon link)
+    let author = '';
+    const authorLink = container.querySelector('a[href*="/search?q="] .icon-\\[mdi--user-edit\\]');
+    if (authorLink) {
+      const link = authorLink.closest('a');
+      if (link) author = link.innerText.trim();
+    }
+    
+    // Get publisher (from company icon link) - extract just the name
+    let publisher = '';
+    const publisherLink = container.querySelector('a[href*="/search?q="] .icon-\\[mdi--company\\]');
+    if (publisherLink) {
+      const link = publisherLink.closest('a');
+      if (link) {
+        const fullText = link.innerText.trim();
+        publisher = fullText.split(',')[0].trim(); // Take first part before comma
+      }
+    }
+    
+    // Combine metadata for chapters field
+    const chapters = [metaText, author, publisher].filter(Boolean).join(' · ');
+    
     results.push({
       title: title,
       url: url,
-      chapters: metaText,
+      chapters: chapters || metaText,
       cover: cover,
       sourceId: 'annas'
     });

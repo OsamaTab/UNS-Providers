@@ -1,6 +1,6 @@
 # How to Write a New Script Source
 
-This guide explains how to create a new source script for a book scraper plugin, similar to the one for Anna's Archive. The script is exported as a JavaScript object and includes metadata, URL builders, and DOM parsing functions.
+This guide explains how to create a new source script for a novel or book scraper plugin, similar to the one for Anna's Archive. The script is exported as a JavaScript object and includes metadata, URL builders, and DOM parsing functions.
 
 ## Prerequisites
 - Basic JavaScript knowledge.
@@ -55,7 +55,7 @@ getSearchUrl: (query, page = 1) => {
 ## 4. Parsing Scripts
 Strings that are IIFEs returning data:
 - `getListScript`: Parse search results.
-- `getBookDetailsScript`: Parse book details.
+- `getNovelDetailsScript`: Parse book or novel details.
 - `getFileInfoScript`: Parse file info.
 - `getDownloadLinkScript`: Get download URL.
 
