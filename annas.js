@@ -1,7 +1,7 @@
 module.exports = {
     id: 'annas',
     name: "Anna's Archive",
-    version: '1.0.5',
+    version: '1.1.0',
     icon: 'https://annas-archive.gl/favicon.ico',
 
     // Categories (adapted for Anna's Archive)
@@ -28,83 +28,174 @@ module.exports = {
     // Search URL
     getSearchUrl: (query, page = 1) => {
         const encodedQuery = encodeURIComponent(query);
-        return `https://annas-archive.gl/search?index=&page=${page}&sort=&display=&q=${encodedQuery}`;
+        return `https://annas-archive.gl/search?q=${encodedQuery}&page=${page}`;
     },
 
     // Novel details script (adapted from FreeWebNovel)
-    getNovelDetailsScript: () => `
+   getNovelDetailsScript: () => `
     (() => {
-        // Get description - look for the book description text
-        const descEl = document.querySelector('.js-vim-focus p, .prose p, .text-gray-700');
-        const description = descEl ? descEl.innerText.trim() : "No description available.";
+        // Get description from the alternative filename and other metadata
+        const descEl = document.querySelector('.js-md5-top-box-description, .prose, .text-gray-700');
+        let description = "No description available.";
         
-        // Get author/creator
-        const authorEl = document.querySelector('a[href*="/creator/"], .text-gray-600 a[href*="/search?q="]');
-        const author = authorEl ? authorEl.innerText.trim() : "Unknown";
-        
-        // Get all file formats/versions as "chapters"
-        const fileLinks = document.querySelectorAll('a[href*="/md5/"], a[href*="/nexusstc/"]');
-        const allFormats = Array.from(fileLinks).map(a => ({
-            title: a.querySelector('h3')?.innerText?.trim() || a.innerText.trim().substring(0, 50),
-            url: a.href
-        }));
-        
-        // Get first available format URL
-        const firstFileEl = document.querySelector('a[href*="/md5/"]');
-        const firstFileUrl = firstFileEl ? firstFileEl.href : window.location.href;
+        if (descEl) {
+            // Try to get alternative filename or other descriptive text
+            const altFilename = descEl.querySelector('div:contains("Alternative filename") + div');
+            if (altFilename) {
+                description = "File: " + altFilename.innerText.trim();
+            } else {
+                description = descEl.innerText.trim();
+            }
+        }
 
-        // Get metadata (size, language, year)
-        const metaEl = document.querySelector('.text-gray-500, .text-xs');
-        const lastChapter = metaEl ? metaEl.innerText.trim() : "N/A";
+        // Get author - look for links with /search?q=author pattern
+        const authorEl = document.querySelector('a[href*="/search?q="]:not([href*="publisher"])');
+        const author = authorEl ? authorEl.innerText.trim() : "Unknown";
+
+        // Get publisher/year info
+        const publisherEl = document.querySelector('a[href*="publisher"], .text-gray-800 a[href*="/search?q="]');
+        const publisher = publisherEl ? publisherEl.innerText.trim() : "";
+        
+        // Get format info from the metadata line
+        const metadataEl = document.querySelector('.text-gray-800.dark\\:text-slate-400');
+        const formatInfo = metadataEl ? metadataEl.innerText.trim() : "No format info";
+
+        // Get file information as "chapters" (different file versions/collections)
+        const fileLinks = document.querySelectorAll('.js-md5-codes-tabs-tab, [id^="md5-codes-tab-"]');
+        const allFormats = Array.from(fileLinks).map(a => ({
+            title: a.innerText.trim().substring(0, 50) + (a.innerText.length > 50 ? '...' : ''),
+            url: window.location.href + '#' + a.id
+        })).filter(f => f.title && f.title.length > 0);
+
+        // Get the main file download URL as first chapter
+        const firstFileUrl = window.location.href;
+
+        // Get stats (downloads, lists)
+        const statsEl = document.querySelector('.text-gray-500 .whitespace-nowrap');
+        const downloads = statsEl ? statsEl.innerText.trim() : "";
+
+        // Get all available metadata from codes panel
+        const codesContainer = document.querySelector('.js-md5-codes-container');
+        const technicalDetails = [];
+        if (codesContainer) {
+            const codeTabs = codesContainer.querySelectorAll('.js-md5-codes-tabs-tab');
+            codeTabs.forEach(tab => {
+                const type = tab.querySelector('span:first-child')?.innerText || 'Info';
+                const value = tab.querySelector('span:last-child')?.innerText || '';
+                if (type && value) {
+                    technicalDetails.push(\`\${type}: \${value}\`);
+                }
+            });
+        }
 
         return {
-            description,
-            author,
-            lastChapter, // Using this for metadata
-            firstChapterUrl: firstFileUrl, // Renamed but using for first file
-            allChapters: allFormats.slice(0, 100) // Limit to 100 formats
+            description: description + (technicalDetails.length > 0 ? '\\n\\nTechnical details:\\n' + technicalDetails.join('\\n') : ''),
+            author: author,
+            lastChapter: formatInfo, // Using this for format info
+            firstChapterUrl: firstFileUrl,
+            allChapters: allFormats.slice(0, 50), // Limit to 50 items
+            // Additional fields that might be useful
+            publisher: publisher,
+            downloads: downloads,
+            fileInfo: metadataEl ? metadataEl.innerText.trim() : ""
         };
     })();`,
 
     // Chapter script (adapted for file details page)
     getChapterScript: () => `
     (() => {
-        // Get file title
-        const title = document.querySelector('h1, h2, .text-3xl')?.innerText?.trim() || "File Details";
+        // Get file title - look for the main title
+        const titleEl = document.querySelector('.font-semibold.text-2xl, h1, h2');
+        const title = titleEl ? titleEl.innerText.trim() : "File Details";
         
         // Get file information as paragraphs
-        const infoContainer = document.querySelector('.prose, .bg-gray-50, .rounded-lg');
         let paragraphs = [];
         
-        if (infoContainer) {
-            // Get all text content split into paragraphs
-            paragraphs = Array.from(infoContainer.querySelectorAll('p, div:not(:has(*))'))
-                .map(el => el.textContent.trim())
-                .filter(text => text.length > 10);
+        // Get the main metadata line
+        const metadataEl = document.querySelector('.text-gray-800.dark\\:text-slate-400');
+        if (metadataEl) {
+            paragraphs.push(metadataEl.innerText.trim());
+        }
+        
+        // Get description/alternative filename
+        const descEl = document.querySelector('.js-md5-top-box-description');
+        if (descEl) {
+            const descText = descEl.innerText.trim();
+            if (descText) {
+                paragraphs.push(descText);
+            }
+        }
+        
+        // Get file size and other details from codes
+        const codesContainer = document.querySelector('.js-md5-codes-container');
+        if (codesContainer) {
+            const codeTabs = codesContainer.querySelectorAll('.js-md5-codes-tabs-tab');
+            const details = Array.from(codeTabs).map(tab => {
+                const type = tab.querySelector('span:first-child')?.innerText || '';
+                const value = tab.querySelector('span:last-child')?.innerText || '';
+                return type && value ? \`\${type}: \${value}\` : null;
+            }).filter(Boolean);
+            
+            if (details.length > 0) {
+                paragraphs.push('\\nTechnical details:');
+                paragraphs.push(...details);
+            }
         }
 
-        // If no paragraphs found, get metadata
-        if (paragraphs.length === 0) {
-            const metaItems = document.querySelectorAll('.grid .col-span-1, .flex.justify-between');
-            paragraphs = Array.from(metaItems)
-                .map(el => el.textContent.trim())
-                .filter(text => text.length > 0);
-        }
-
-        // Find download link as "next" button
-        const downloadBtn = Array.from(document.querySelectorAll('a')).find(a => {
-            const text = (a.innerText || '').toLowerCase();
-            return text.includes('slow') || 
-                   text.includes('external') || 
-                   text.includes('download') ||
-                   a.href.includes('libgen') ||
-                   a.href.includes('ipfs');
+        // Find download links (both fast and slow)
+        const downloadLinks = [];
+        
+        // Fast downloads
+        const fastLinks = document.querySelectorAll('#md5-panel-downloads a[href*="/fast_download/"]');
+        fastLinks.forEach(link => {
+            if (link.href && link.innerText.trim()) {
+                downloadLinks.push({
+                    text: link.innerText.trim(),
+                    url: link.href
+                });
+            }
         });
+        
+        // Slow downloads
+        const slowLinks = document.querySelectorAll('#md5-panel-downloads a[href*="/slow_download/"]');
+        slowLinks.forEach(link => {
+            if (link.href && link.innerText.trim()) {
+                downloadLinks.push({
+                    text: link.innerText.trim(),
+                    url: link.href
+                });
+            }
+        });
+        
+        // External downloads
+        const externalLinks = document.querySelectorAll('#md5-panel-downloads .js-show-external a');
+        externalLinks.forEach(link => {
+            if (link.href && link.innerText.trim()) {
+                downloadLinks.push({
+                    text: "External: " + link.innerText.trim(),
+                    url: link.href
+                });
+            }
+        });
+
+        // Add download links as paragraphs if they exist
+        if (downloadLinks.length > 0) {
+            paragraphs.push('\\n📥 Download options:');
+            downloadLinks.slice(0, 10).forEach(link => {
+                paragraphs.push(\`• \${link.text}: \${link.url}\`);
+            });
+        }
+
+        // Find the first available download link as "nextUrl"
+        const firstDownload = downloadLinks.find(link => 
+            link.url.includes('/fast_download/') || 
+            link.url.includes('/slow_download/')
+        );
 
         return {
             title: title,
             paragraphs: paragraphs.length > 0 ? paragraphs : ["No details available."],
-            nextUrl: downloadBtn ? downloadBtn.href : null
+            nextUrl: firstDownload ? firstDownload.url : null
         };
     })();`,
 
@@ -201,18 +292,36 @@ module.exports = {
     // Download link script (updated)
     getDownloadLinkScript: () => `
     (() => {
-        // Look for download links
-        const links = Array.from(document.querySelectorAll('a[href*="libgen"], a[href*="ipfs"], a[href*="download"], a[href*="archive.org"]'));
+        // Try to find fast download links first
+        const fastLinks = Array.from(document.querySelectorAll('a[href*="/fast_download/"]'));
+        if (fastLinks.length > 0) {
+            // Prefer recommended ones
+            const recommended = fastLinks.find(link => 
+                link.innerText.toLowerCase().includes('recommended')
+            );
+            return recommended ? recommended.href : fastLinks[0].href;
+        }
         
-        const downloadButtons = Array.from(document.querySelectorAll('button, a')).filter(el => 
-            el.innerText.toLowerCase().includes('slow') ||
-            el.innerText.toLowerCase().includes('external') ||
+        // Then try slow download links
+        const slowLinks = Array.from(document.querySelectorAll('a[href*="/slow_download/"]'));
+        if (slowLinks.length > 0) {
+            return slowLinks[0].href;
+        }
+        
+        // Then try external links
+        const externalLinks = Array.from(document.querySelectorAll('.js-show-external a[href*="libgen"], .js-show-external a[href*="z-lib"]'));
+        if (externalLinks.length > 0) {
+            return externalLinks[0].href;
+        }
+        
+        // Finally, look for any download button
+        const downloadButtons = Array.from(document.querySelectorAll('a, button')).filter(el => 
             el.innerText.toLowerCase().includes('download') ||
-            el.innerText.toLowerCase().includes('mirror')
+            el.innerText.toLowerCase().includes('slow') ||
+            el.innerText.toLowerCase().includes('fast')
         );
         
-        const allLinks = [...links, ...downloadButtons.map(b => b.href ? b : b.querySelector('a')).filter(Boolean)];
-        
-        return allLinks.length > 0 ? allLinks[0].href : null;
-    })()`
+        const firstButtonWithLink = downloadButtons.find(b => b.href || b.querySelector('a'));
+        return firstButtonWithLink ? (firstButtonWithLink.href || firstButtonWithLink.querySelector('a').href) : null;
+    })()`,
 };
