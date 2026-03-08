@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.2.6',
+  version: '1.2.7',
   icon: 'https://annas-archive.gl/favicon.ico',
   categories: [
     { id: 'recent', name: 'Recent' },
@@ -29,16 +29,17 @@ module.exports = {
 
     getNovelDetailsScript: () => `
         (() => {
-            // --- STEP 1: Link Extraction Logic ---
-            let downloadLink = window.location.href; // Default fallback
+            // --- STEP 1: Final Download Link Extraction ---
+            let downloadLink = window.location.href; 
 
-            // 1a. Check if we are on the final download page (looking for the span.break-all)
-            const urlSpan = document.querySelector('span.break-all');
-            if (urlSpan && urlSpan.innerText.includes('http')) {
-                downloadLink = urlSpan.innerText.trim();
-            } 
-            // 1b. If not on the final page, look for the "No Waitlist" server link
-            else {
+            // Look for the span that specifically contains the full momot.rs URL
+            // This is found on the page AFTER clicking the "no waitlist" server.
+            const finalUrlSpan = document.querySelector('span.break-all');
+            
+            if (finalUrlSpan && finalUrlSpan.innerText.trim().startsWith('http')) {
+                downloadLink = finalUrlSpan.innerText.trim();
+            } else {
+                // If we aren't on the final page yet, find the first "No Waitlist" server link
                 const slowLinks = Array.from(document.querySelectorAll('a[href*="/slow_download/"]'));
                 const noWaitlistLink = slowLinks.find(link => 
                     link.parentElement.textContent.toLowerCase().includes('no waitlist')
@@ -48,23 +49,17 @@ module.exports = {
                 }
             }
 
-            // --- STEP 2: Existing Metadata Extraction ---
-            
-            // Get title
+            // --- STEP 2: Metadata Extraction ---
             const titleEl = document.querySelector('.font-semibold.text-2xl');
             const title = titleEl ? titleEl.innerText.trim().replace('🔍', '').trim() : '';
             
-            // Get author
             const authorEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--user-edit]');
             let author = 'Unknown';
             if (authorEl) {
                 const authorLink = authorEl.closest('a');
-                if (authorLink) {
-                    author = authorLink.innerText.trim();
-                }
+                if (authorLink) author = authorLink.innerText.trim();
             }
             
-            // Get publisher/year
             const publisherEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--company]');
             let publisher = '';
             if (publisherEl) {
@@ -75,7 +70,6 @@ module.exports = {
                 }
             }
             
-            // Get description
             const descEl = document.querySelector('.js-md5-top-box-description');
             let description = '';
             if (descEl) {
@@ -83,44 +77,26 @@ module.exports = {
                 description = lines.filter(line => line.length > 0).join('\\n');
             }
             
-            // Get metadata line
             const metadataEl = document.querySelector('.text-gray-800.dark\\\\:text-slate-400');
             const metadata = metadataEl ? metadataEl.innerText.trim() : '';
             
-            // Get cover image
             let cover = null;
             const coverContainer = document.querySelector('div[id^="cover_aarecord_id__md5:"]');
             if (coverContainer) {
                 const coverImg = coverContainer.querySelector('img');
                 if (coverImg) {
                     cover = coverImg.getAttribute('data-src') || coverImg.src;
-                    if (cover && cover.startsWith('/')) {
-                        cover = 'https://annas-archive.gl' + cover;
-                    }
-                }
-            }
-            
-            if (!cover) {
-                const listCoverContainer = document.querySelector('div[id^="list_cover_aarecord_id__md5:"]');
-                if (listCoverContainer) {
-                    const listCoverImg = listCoverContainer.querySelector('img');
-                    if (listCoverImg) {
-                        cover = listCoverImg.getAttribute('data-src') || listCoverImg.src;
-                        if (cover && cover.startsWith('/')) {
-                            cover = 'https://annas-archive.gl' + cover;
-                        }
-                    }
+                    if (cover && cover.startsWith('/')) cover = 'https://annas-archive.gl' + cover;
                 }
             }
 
-            // Return the final object
             return {
                 title: title,
                 description: description || 'No description available.',
                 author: author,
                 lastChapter: metadata,
-                firstChapterUrl: downloadLink,
-                allChapters: [],
+                firstChapterUrl: downloadLink, // Now extracts the momot.rs link correctly
+                allChapters: [], 
                 cover: cover,
                 publisher: publisher
             };
