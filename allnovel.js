@@ -1,7 +1,7 @@
 module.exports = {
     id: 'allnovel',
     name: 'AllNovel',
-    version: '1.1.0',
+    version: '1.1.1',
     icon: 'https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png',
     
     // 1. Define available categories for this specific site
@@ -15,10 +15,10 @@ module.exports = {
     getCategoryUrl: (categoryId, page = 1) => {
         const baseUrl = 'https://allnovel.org';
         switch (categoryId) {
-            case 'popular': return `${baseUrl}/most-viewed?page=${page}`;
-            case 'latest': return `${baseUrl}/latest-release?page=${page}`;
-            case 'completed': return `${baseUrl}/completed?page=${page}`;
-            default: return `${baseUrl}/most-viewed?page=${page}`;
+            case 'Hot': return `${baseUrl}/hot-novel?page=${page}`;
+            case 'latest': return `${baseUrl}/latest-release-novel?page=${page}`;
+            case 'completed': return `${baseUrl}/completed-novel?page=${page}`;
+            default: return `${baseUrl}/most-popular?page=${page}`;
         }
     },
 
