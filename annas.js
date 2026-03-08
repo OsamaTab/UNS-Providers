@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.2.2',
+  version: '1.2.3',
   icon: 'https://annas-archive.gl/favicon.ico',
   categories: [
     { id: 'recent', name: 'Recent' },
@@ -24,104 +24,6 @@ module.exports = {
     const encodedQuery = encodeURIComponent(query);
     return `https://annas-archive.gl/search?index=&page=${page}&sort=&display=&q=${encodedQuery}`;
   },
-  getListScript: () => `
-(() => {
-  const results = [];
-  
-  // Target the actual search result containers: flex divs with border separator
-  const resultContainers = document.querySelectorAll('div.flex[class*="border-b"], div.flex.pt-3');
-  
-  resultContainers.forEach(container => {
-    // Find the main link that contains both cover and title (href contains /md5/)
-    const mainLink = container.querySelector('a[href*="/md5/"]');
-    if (!mainLink) return;
-    
-    // Get title from the link text or from the h3/font-semibold element
-    const titleEl = mainLink.querySelector('.js-vim-focus, .font-semibold, .line-clamp-\\[3\\]');
-    const title = titleEl ? titleEl.innerText.trim() : mainLink.innerText.trim().split('\\n')[0];
-    if (!title || title.length < 2) return;
-    
-    const url = mainLink.href.startsWith('http') ? mainLink.href : 'https://annas-archive.gl' + mainLink.href;
-    
-    // === COVER IMAGE EXTRACTION (FIXED) ===
-    let cover = null;
-    
-    // Strategy 1: Look for actual img element inside the cover container
-    const coverContainer = mainLink.querySelector('[id*="list_cover_aarecord_id__md5:"], [id*="cover_aarecord_id__md5:"]');
-    if (coverContainer) {
-      const img = coverContainer.querySelector('img');
-      if (img) {
-        // Get src or data-src, and TRIM whitespace (important!)
-        let src = img.getAttribute('data-src') || img.getAttribute('src') || '';
-        src = src.trim(); // ← Critical fix: removes trailing spaces like "  "
-        if (src && src.startsWith('http')) {
-          cover = src;
-        } else if (src && src.startsWith('/')) {
-          cover = 'https://annas-archive.gl' + src;
-        }
-      }
-    }
-    
-    // Strategy 2: Fallback - search entire container for img if not found yet
-    if (!cover) {
-      const img = container.querySelector('img');
-      if (img) {
-        let src = (img.getAttribute('data-src') || img.getAttribute('src') || '').trim();
-        if (src && src.startsWith('http')) {
-          cover = src;
-        } else if (src && src.startsWith('/')) {
-          cover = 'https://annas-archive.gl' + src;
-        }
-      }
-    }
-    
-    // Strategy 3: Handle fallback cover (no actual image available)
-    if (!cover) {
-      const fallbackCover = container.querySelector('.js-aarecord-list-fallback-cover');
-      if (fallbackCover && !fallbackCover.classList.contains('hidden')) {
-        // No real image exists - keep cover as null, app can show placeholder
-        cover = null;
-      }
-    }
-    
-    // === METADATA EXTRACTION ===
-    // Get format/size/language line (gray text below title)
-    const metaEl = container.querySelector('.text-gray-800.dark\\\\:text-slate-400, .text-sm.text-gray-600');
-    const metaText = metaEl ? metaEl.innerText.trim().split('·')[0]?.trim() || metaEl.innerText.trim() : '';
-    
-    // Get author (from user-edit icon link)
-    let author = '';
-    const authorLink = container.querySelector('a[href*="/search?q="] .icon-\\[mdi--user-edit\\]');
-    if (authorLink) {
-      const link = authorLink.closest('a');
-      if (link) author = link.innerText.trim();
-    }
-    
-    // Get publisher (from company icon link) - extract just the name
-    let publisher = '';
-    const publisherLink = container.querySelector('a[href*="/search?q="] .icon-\\[mdi--company\\]');
-    if (publisherLink) {
-      const link = publisherLink.closest('a');
-      if (link) {
-        const fullText = link.innerText.trim();
-        publisher = fullText.split(',')[0].trim(); // Take first part before comma
-      }
-    }
-    
-    // Combine metadata for chapters field
-    const chapters = [metaText, author, publisher].filter(Boolean).join(' · ');
-    
-    results.push({
-      title: title,
-      url: url,
-      chapters: chapters || metaText,
-      cover: cover,
-      sourceId: 'annas'
-    });
-  });
-  
-  return results;
-})();`,
   getNovelDetailsScript: () => `
 (() => {
   // Get title - from the font-semibold text-2xl div
@@ -314,6 +216,96 @@ module.exports = {
     nextUrl: downloadLinks.length > 0 ? downloadLinks[0].url : null
   };
 })();`,
+
+getListScript: () => `
+    (() => {
+        const results = [];
+        
+        const parseItem = (item) => {
+            const linkEl = item.querySelector('h3 a') || item.querySelector('a');
+            if (!linkEl) return;
+
+            const title = linkEl.innerText.trim();
+            const url = linkEl.href;
+            
+            const metaContainer = item.querySelector('.text-gray-500, .text-xs, .text-sm');
+            const metaText = metaContainer ? metaContainer.innerText : '';
+            
+            // IMPROVED COVER HANDLING
+            let cover = null;
+            
+            // Try multiple ways to get the cover
+            const imgEl = item.querySelector('img');
+            if (imgEl) {
+                // Try data-src first (lazy loading)
+                cover = imgEl.getAttribute('data-src') || 
+                        imgEl.getAttribute('data-lazy-src') || 
+                        imgEl.src;
+                
+                // Clean up the URL
+                if (cover) {
+                    // Handle relative URLs
+                    if (cover.startsWith('//')) {
+                        cover = 'https:' + cover;
+                    } else if (cover.startsWith('/')) {
+                        cover = 'https://annas-archive.gl' + cover;
+                    }
+                    
+                    // Remove size limitations if present
+                    cover = cover.replace(/&w=\d+/, '').replace(/&h=\d+/, '');
+                    
+                    // Anna's Archive sometimes uses placeholder images
+                    if (cover.includes('placeholder') || cover.includes('1x1')) {
+                        // Try to get a better cover from other attributes
+                        const parentDiv = imgEl.closest('div');
+                        if (parentDiv) {
+                            const style = parentDiv.getAttribute('style');
+                            if (style && style.includes('background-image')) {
+                                const match = style.match(/url\\(['"]?([^'"]+)['"]?\\)/);
+                                if (match) cover = match[1];
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // If no cover found, try looking for cover in background images
+            if (!cover || cover.includes('placeholder')) {
+                const coverDiv = item.querySelector('[style*="background-image"]');
+                if (coverDiv) {
+                    const style = coverDiv.getAttribute('style');
+                    const match = style.match(/url\\(['"]?([^'"]+)['"]?\\)/);
+                    if (match) {
+                        cover = match[1];
+                        if (cover.startsWith('/')) {
+                            cover = 'https://annas-archive.gl' + cover;
+                        }
+                    }
+                }
+            }
+
+            results.push({
+                title: title,
+                url: url.startsWith('http') ? url : 'https://annas-archive.gl' + url,
+                chapters: metaText.trim(),
+                cover: cover,
+                sourceId: 'annas'
+            });
+        };
+
+        // Multiple selector strategies
+        document.querySelectorAll('[class*="h-[125px]"], .js-vim-focus, .flex.items-start, article, [data-testid="result-item"]').forEach(parseItem);
+        
+        document.querySelectorAll('a[href*="/md5/"], a[href*="/nexusstc/"], a[href*="/details/"]').forEach(link => {
+            const container = link.closest('div[class*="flex"], div[class*="relative"], article, li');
+            if (container && !results.some(r => r.url === link.href)) {
+                parseItem(container);
+            }
+        });
+
+        return results;
+    })();`,
+
   getDownloadLinkScript: () => `
 (() => {
   // Try fast downloads first
