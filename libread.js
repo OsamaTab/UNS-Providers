@@ -2,7 +2,7 @@ module.exports = {
     id: 'libread',
     name: 'LibRead',
     version: '1.1.0',
-    icon: 'https://libread.com/favicon.ico', // Standard favicon fallback
+    icon: 'https://libread.com/static/libread/images/logo.png', // Standard favicon fallback
     
     // 1. Define available categories
     categories: [
