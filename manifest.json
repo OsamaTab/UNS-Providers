@@ -12,17 +12,19 @@
     {
         "id": "hiraethtranslation",
         "version": "1.1.0",
+        "beta": true,
         "icon": "https://hiraethtranslation.com/wp-content/uploads/2023/03/HTL.png"
     },
     {
         "id": "libread",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "beta": true,
-        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+        "icon": "https://libread.com/favicon.ico"
     },
     {
         "id": "novelbin",
         "version": "1.1.0",
+        "beta": true,
         "icon": "https://novelbin.com/apple-touch-icon.png"
     },
     {
@@ -32,15 +34,15 @@
     },
     {
         "id": "pawread",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "beta": true,
-        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+        "icon": "https://pawread.com/favicon.ico"
     },
     {
         "id": "readfromnet",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "beta": true,
-        "icon": "https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png"
+        "icon": "https://static.readfrom.net//templates/readfromnet/images/logo41.png"
     },
     {
         "id": "royalroad",

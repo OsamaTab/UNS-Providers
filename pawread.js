@@ -1,12 +1,85 @@
 module.exports = {
     id: 'pawread',
     name: 'PawRead',
-    getPopularUrl: () => `https://pawread.com/list/most-popular/`,
+    version: '1.1.0',
+    icon: 'https://pawread.com/favicon.ico', // Standard favicon
     
-    // Updated 'key=' to 'keyword=' and converted spaces to '+' to prevent server errors
-    getSearchUrl: (query) => `https://pawread.com/search/?keyword=${encodeURIComponent(query).replace(/%20/g, '+')}`,
+    // 1. Define available categories
+    categories: [
+        { id: 'popular', name: 'Most Popular' },
+        { id: 'latest', name: 'Latest Updates' },
+        { id: 'completed', name: 'Completed' }
+    ],
+
+    // 2. Map category URLs with pagination
+    getCategoryUrl: (categoryId, page = 1) => {
+        const baseUrl = 'https://pawread.com/list';
+        const pageParam = page > 1 ? `?page=${page}` : '';
+        
+        switch (categoryId) {
+            case 'popular': return `${baseUrl}/most-popular/${pageParam}`;
+            case 'latest': return `${baseUrl}/latest-release/${pageParam}`;
+            case 'completed': return `${baseUrl}/completed/${pageParam}`;
+            default: return `${baseUrl}/most-popular/${pageParam}`;
+        }
+    },
     
-    getSearchScript: () => `
+    // 3. Search URL with pagination (Keeping your encoded keyword logic)
+    getSearchUrl: (query, page = 1) => {
+        const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
+        return `https://pawread.com/search/?keyword=${encodedQuery}${page > 1 ? '&page=' + page : ''}`;
+    },
+
+    // 4. Details Extraction
+    getNovelDetailsScript: () => `
+    (() => {
+        // Extract Description
+        const descEl = document.querySelector('.description, .summary, .comic_detail_txt, #desc');
+        const description = descEl ? descEl.innerText.trim() : "No description available.";
+
+        // Extract Author
+        const authorEl = document.querySelector('.author, .comic_detail_info a[href*="author"], a[href*="author"]');
+        const author = authorEl ? authorEl.innerText.trim() : "Unknown Author";
+
+        // Extract Chapters
+        const chapterLinks = document.querySelectorAll('.chapter-list a, #chapterlist a, ul.chapters li a, .list-chapter li a');
+        let allChapters = Array.from(chapterLinks).map(a => ({
+            title: a.title || a.innerText.trim(),
+            url: a.href
+        }));
+
+        // Safety Check: Some PawRead themes list newest chapters first.
+        // We do a quick check to see if we need to reverse the array so Chapter 1 is at the top.
+        if (allChapters.length > 1) {
+            const firstTitle = allChapters[0].title.toLowerCase();
+            const lastTitle = allChapters[allChapters.length - 1].title.toLowerCase();
+            const firstMatch = firstTitle.match(/\\d+/);
+            const lastMatch = lastTitle.match(/\\d+/);
+            
+            if (firstMatch && lastMatch) {
+                if (parseInt(firstMatch[0]) > parseInt(lastMatch[0])) {
+                    allChapters.reverse();
+                }
+            }
+        }
+
+        const lastChText = allChapters.length > 0 ? allChapters[allChapters.length - 1].title : "N/A";
+        
+        // Find the "Read First" button or fallback to the first chapter in the list
+        const firstChEl = document.querySelector('.btn-read, .read-btn, a[href*="chapter-1"]');
+        const firstChapterUrl = firstChEl ? firstChEl.href : (allChapters.length > 0 ? allChapters[0].url : window.location.href);
+
+        return {
+            description,
+            author,
+            lastChapter: lastChText,
+            firstChapterUrl,
+            allChapters: allChapters.slice(0, 500) // Truncate to prevent IPC memory crash
+        };
+    })();`,
+    
+    // 5. Renamed to getListScript (Uses your advanced layout traversal logic)
+    getListScript: () => `
     (() => {
         const results = [];
         
