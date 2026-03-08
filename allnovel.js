@@ -6,36 +6,35 @@ module.exports = {
     getSearchUrl: (query) => `https://allnovel.org/search?keyword=${encodeURIComponent(query).replace(/%20/g, '+')}`,
 
     getNovelDetailsScript: () => `
-    (() => {
-        // 1. Get the description
-        const descEl = document.querySelector('.desc-text, .summary');
-        const description = descEl ? descEl.innerText.trim() : "No description available.";
+        (() => {
+            // 1. Description (Check multiple selectors)
+            const descEl = document.querySelector('.desc-text, .summary, .description, #description');
+            const description = descEl ? descEl.innerText.trim() : "No description available.";
 
-        // 2. Get the author
-        const authorEl = document.querySelector('.author, .info-item a');
-        const author = authorEl ? authorEl.innerText.trim() : "Unknown";
+            // 2. Author
+            const authorEl = document.querySelector('.author, .info-item a, a[href*="author"]');
+            const author = authorEl ? authorEl.innerText.trim() : "Unknown";
 
-        // 3. Get all chapters
-        // NOTE: You will need to customize these selectors for each website!
-        const chapterLinks = document.querySelectorAll('ul.list-chapter li a, .chapter-list a');
-        const allChapters = Array.from(chapterLinks).map(a => ({
-            title: a.innerText.trim(),
-            url: a.href
-        }));
+            // 3. Chapters (Optimized for 2000+ chapters)
+            const chapterLinks = document.querySelectorAll('ul.list-chapter li a, .chapter-list a, #list-chapter a');
+            const allChapters = Array.from(chapterLinks).map(a => ({
+                title: a.innerText.trim(),
+                url: a.href
+            }));
 
-        // 4. Get last chapter text and first chapter URL
-        const lastChText = allChapters.length > 0 ? allChapters[allChapters.length - 1].title : "N/A";
-        const firstChEl = document.querySelector('a.btn-read-now, a[href*="chapter-1"]');
-        const firstChapterUrl = firstChEl ? firstChEl.href : window.location.href;
+            // 4. Meta Info
+            const lastChText = allChapters.length > 0 ? allChapters[allChapters.length - 1].title : "N/A";
+            const firstChEl = document.querySelector('a.btn-read-now, a[href*="chapter-1"], .read-first');
+            const firstChapterUrl = firstChEl ? firstChEl.href : (allChapters.length > 0 ? allChapters[0].url : window.location.href);
 
-        return {
-            description,
-            author,
-            lastChapter: lastChText, 
-            firstChapterUrl,
-            allChapters 
-        };
-    })();`,
+            return {
+                description,
+                author,
+                lastChapter: lastChText, 
+                firstChapterUrl,
+                allChapters: allChapters.slice(0, 500) // Safety: Only send the first 500 chapters to prevent IPC crash
+            };
+        })();`,
 
     getSearchScript: () => `
     (() => {
