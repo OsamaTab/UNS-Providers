@@ -1,9 +1,9 @@
 module.exports = {
     id: 'readfromnet',
     name: 'ReadFrom.Net',
-    version: '1.4.0',
+    version: '1.5.0',
     icon: 'https://static.readfrom.net//templates/readfromnet/images/logo41.png',
-    
+
     // 1. Define available categories
     categories: [
         { id: 'popular', name: 'Home / Popular' },
@@ -14,14 +14,14 @@ module.exports = {
     getCategoryUrl: (categoryId, page = 1) => {
         const baseUrl = 'https://readfrom.net';
         const pagePath = page > 1 ? `page/${page}/` : '';
-        
+
         switch (categoryId) {
             case 'popular': return `${baseUrl}/home/${pagePath}`;
             case 'latest': return `${baseUrl}/${pagePath}`;
             default: return `${baseUrl}/home/${pagePath}`;
         }
     },
-    
+
     // 3. Search URL with basic pagination fallback
     getSearchUrl: (query, page = 1) => {
         const encodedQuery = encodeURIComponent(query).replace(/%20/g, '+');
@@ -30,80 +30,79 @@ module.exports = {
 
     getChapterScript: () => `
     (() => {
-        // 1. Title Selection
-        const titleEl = document.querySelector('h1, h2, .b-title, .chapter-title, .tit, .page-header');
-        const title = titleEl ? titleEl.innerText.trim() : 'Untitled Page';
+        // 1. Title Selection (Cleaned up formatting)
+        // Removes the weird spacing and hidden spans from the title
+        const titleEl = document.querySelector('h2.title, h1, .b-title, .chapter-title, .tit, .page-header');
+        let title = 'Untitled Page';
+        if (titleEl) {
+            titleEl.querySelectorAll('span.masha_index').forEach(el => el.remove());
+            title = titleEl.innerText.replace(/\\s+/g, ' ').trim();
+        }
         
-        // 2. DOM SANITIZATION (Delete the junk before reading)
-        const junkSelectors = [
-            'script', 'style', 'iframe', 'button', 'select', 'noscript', 
-            '.splitnewsnavigation', '.page_prev', '.page_next', 
-            '[id^="image"]', 'label', 'input', '.ad', '#holder'
-        ];
-        document.querySelectorAll(junkSelectors.join(', ')).forEach(el => el.remove());
-
-        // 3. Content Selection
-        const contentSelectors = ['.book-text', '#content', '.page-content', '.story', 'article'];
+        // 2. EXACT CONTENT TARGETING (Bypasses all ads and UI junk)
+        const mainContainer = document.querySelector('#textToRead');
         let paragraphs = [];
-        
-        for (let selector of contentSelectors) {
-            const container = document.querySelector(selector);
-            if (!container) continue;
 
-            // Try standard <p> tags first
-            const pTags = Array.from(container.querySelectorAll('p'))
-                .map(p => p.innerText.trim())
-                .filter(text => text.length > 0 && !text.includes('CancelReport Ad'));
+        if (mainContainer) {
+            // Delete any hidden tracking spans or images inside the text box
+            mainContainer.querySelectorAll('script, style, iframe, .masha_index, a.highslide').forEach(el => el.remove());
             
-            if (pTags.length > 0) {
-                paragraphs = pTags;
-                break;
-            }
+            // The browser's innerText automatically converts <br> tags into clean newlines.
+            // We split by newline, clean up spaces, and filter out short lines.
+            paragraphs = mainContainer.innerText.split('\\n')
+                .map(p => p.trim())
+                .filter(text => text.length > 5 && !text.includes('CancelReport') && !text.includes('Support this site'));
+        } else {
+            // Fallback just in case some books don't use #textToRead
+            const contentSelectors = ['.book-text', '#content', '.page-content', '.story', 'article'];
+            for (let selector of contentSelectors) {
+                const container = document.querySelector(selector);
+                if (!container) continue;
 
-            // Fallback: Read raw text nodes (for sites that just use <br> tags)
-            // TreeWalker perfectly extracts text without grabbing HTML wrappers
-            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-            let node;
-            while ((node = walker.nextNode())) {
-                const text = node.textContent.trim();
-                // Filter out tiny UI strings, ad remnants, and empty lines
-                if (text.length > 15 && !text.includes('Support this site') && !text.includes('CancelReport Ad')) {
-                    paragraphs.push(text);
+                container.querySelectorAll('script, style, iframe, button, select, noscript, .splitnewsnavigation, .page_prev, .page_next, [id^="image"], label, input, .ad, #holder').forEach(el => el.remove());
+
+                const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+                let node;
+                while ((node = walker.nextNode())) {
+                    const text = node.textContent.trim();
+                    if (text.length > 15 && !text.includes('Support this site') && !text.includes('CancelReport Ad')) {
+                        paragraphs.push(text);
+                    }
                 }
+                if (paragraphs.length > 0) break;
             }
-            if (paragraphs.length > 0) break;
         }
 
-        // --- 4. EXACT NEXT URL FINDER ---
+        // --- 3. BULLETPROOF NEXT URL FINDER ---
         let nextUrl = null;
 
-        const exactNextBtn = document.querySelector('.page_next a');
-        if (exactNextBtn && exactNextBtn.href) {
-            nextUrl = exactNextBtn.href;
+        // The HTML provides multiple .page_next a elements. We loop through them 
+        // to grab the first one that has an actual, valid http link.
+        const exactNextBtns = Array.from(document.querySelectorAll('.page_next a'));
+        for (let btn of exactNextBtns) {
+            if (btn.href && btn.href.startsWith('http') && !btn.href.includes('javascript:')) {
+                nextUrl = btn.href;
+                break; // Found it!
+            }
         }
 
+        // Fallback for weird layouts
         if (!nextUrl) {
             const nextBtn = Array.from(document.querySelectorAll('a')).find(a => {
                 const text = (a.innerText || a.textContent || '').toLowerCase().trim();
                 const parentClass = (a.parentElement?.className || '').toLowerCase();
-                const parentTitle = (a.parentElement?.getAttribute('title') || '').toLowerCase();
                 const absoluteHref = a.href || '';
 
                 if (!absoluteHref.startsWith('http') || absoluteHref.split('#')[0] === window.location.href.split('#')[0]) {
                     return false;
                 }
 
-                if (text.includes('prev') || parentClass.includes('prev') || parentTitle.includes('prev')) {
-                    return false;
-                }
+                if (text.includes('prev') || parentClass.includes('prev')) return false;
 
-                return text.includes('next') || text.includes('>>') || text === '>' ||
-                       parentClass.includes('next') || parentTitle.includes('next');
+                return text.includes('next') || text.includes('>>') || text === '>' || parentClass.includes('next');
             });
 
-            if (nextBtn) {
-                nextUrl = nextBtn.href;
-            }
+            if (nextBtn) nextUrl = nextBtn.href;
         }
 
         return {
@@ -161,7 +160,7 @@ module.exports = {
             allChapters: allChapters.slice(0, 500) // Truncate to prevent IPC memory crash
         };
     })();`,
-    
+
     // 5. Renamed to getListScript (Uses your specific extraction logic)
     getListScript: () => `
     (() => {
