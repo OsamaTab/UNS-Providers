@@ -58,7 +58,6 @@
         "id": "readfromnet",
         "version": "1.5.0",
         "type": "Novels",
-        "beta": true,
         "icon": "https://static.readfrom.net//templates/readfromnet/images/logo41.png"
     },
     {
