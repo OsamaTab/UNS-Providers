@@ -1,78 +1,133 @@
-# How to Write a New Script Source
+# 📚 Universal Novel Scraper (UNS) - Provider Development Guide
 
-This guide explains how to create a new source script for a novel or book scraper plugin, similar to the one for Anna's Archive. The script is exported as a JavaScript object and includes metadata, URL builders, and DOM parsing functions.
+Welcome to the UNS Provider Development Guide! This document explains how to create a new source script (provider) to expand the app's library.
 
-## Prerequisites
-- Basic JavaScript knowledge.
-- Understanding of DOM selectors (e.g., `querySelector`).
-- Test in a browser console for selectors.
+Providers are JavaScript modules that define how the app navigates a specific website, searches for novels, and extracts chapter data or direct file downloads. Because UNS runs on Electron, your extraction scripts are injected directly into a hidden Chromium browser window, giving you full access to the live DOM.
 
-## Structure
-The script is a module like this:
-```js
+---
+
+## 🛠️ Prerequisites
+
+Before building a provider, you should be comfortable with:
+
+* **Modern JavaScript (ES6+)**
+* **DOM Manipulation & Selectors:** (`document.querySelector`, `querySelectorAll`, etc.)
+* **Browser DevTools:** Testing your extraction logic in the Chrome/Edge console before pasting it into your script is highly recommended!
+
+---
+
+## 🏗️ The Anatomy of a Provider
+
+Every provider exports a single configuration object. Create a new file (e.g., `newsite.js`) and structure it like this:
+
+```javascript
 module.exports = {
-  // Metadata, categories, functions...
+    // 1. Metadata
+    id: 'newsite',
+    name: 'New Site',
+    version: '1.0.0',
+    icon: 'https://newsite.com/favicon.ico',
+    mode: 'scrape', // 'scrape' for chapter-by-chapter, 'download' for direct files
+
+    // 2. Categories
+    categories: [],
+
+    // 3. URL Builders
+    getCategoryUrl: (categoryId, page = 1) => { ... },
+    getSearchUrl: (query, page = 1) => { ... },
+
+    // 4. DOM Extraction Scripts (Returned as Strings)
+    getListScript: () => `(() => { ... })()`,
+    getNovelDetailsScript: () => `(() => { ... })()`,
+    getChapterScript: () => `(() => { ... })()`
 };
+
 ```
 
-## 1. Metadata
-Define basic info:
-- `id`: Unique string.
-- `name`: Display name.
-- `version`: String (e.g., '1.0.0').
-- `type`: Sorce type.
-- `beta`: Boolean (optional, for testing).
-- `icon`: Favicon URL.
+---
 
-Example:
-```js
-id: 'newsite',
-name: "New Site",
-version: '1.0.0',
-type: "Novels",
-beta: true,
-icon: 'https://newsite.com/favicon.ico',
-```
+## 1. Core Metadata
 
-## 2. Categories
-Array of objects for browsing sections:
-```js
+Define the identity and behavior of your provider.
+
+| Property | Type | Description |
+| --- | --- | --- |
+| **`id`** | `String` | Unique identifier (lowercase, no spaces). Must match the filename (e.g., `allnovel`). |
+| **`name`** | `String` | The display name shown in the UI. |
+| **`version`** | `String` | Semantic versioning (e.g., `'1.0.0'`). |
+| **`icon`** | `String` | Absolute URL to the site's favicon or logo. |
+| **`mode`** | `String` | **Crucial:** Use `'scrape'` if the app needs to read chapters one by one. Use `'download'` if the site provides direct `.epub`, `.pdf`, or `.mobi` files (like Anna's Archive). |
+| **`beta`** | `Boolean` | *(Optional)* Set to `true` to flag this source as experimental in the UI. |
+
+---
+
+## 2. Categories & Navigation
+
+Help the app navigate the source's library and search functionality.
+
+### `categories`
+
+An array of objects defining the browseable tabs for this source.
+
+```javascript
 categories: [
-  { id: 'category1', name: 'Category 1' },
-  // ...
-],
+    { id: 'hot', name: 'Hot' },
+    { id: 'latest', name: 'Latest Updates' }
+]
+
 ```
 
-## 3. URL Builders
-Functions to generate URLs:
-```js
-getCategoryUrl: (categoryId, page = 1) => {
-  // Build URL based on categoryId and page
-},
-getSearchUrl: (query, page = 1) => {
-  // Encode query and build search URL
-},
+### URL Builders
+
+Functions that return the exact URL the hidden browser should navigate to.
+
+```javascript
+// Build URL for a specific category and page
+getCategoryUrl: (categoryId, page = 1) => `https://example.com/category/${categoryId}?page=${page}`,
+
+// Build URL for a user search query
+getSearchUrl: (query, page = 1) => `https://example.com/search?q=${encodeURIComponent(query)}&page=${page}`
+
 ```
 
-## 4. Parsing Scripts
-Strings that are IIFEs returning data:
-- `getCategoryUrl`: Parse category results.
-- `getChapterScript`: Parse chapter results.
-- `getListScript`: Parse search results.
-- `getNovelDetailsScript`: Parse book or novel details.
-- `getFileInfoScript`: Parse file info.
+---
 
-Use `document.querySelectorAll` to extract data.
+## 3. DOM Extraction Scripts
 
-## manifest.json Example
-```js
+**⚠️ Important:** These functions must return a **String** containing an Immediately Invoked Function Expression (IIFE). Electron executes this string inside the target webpage.
+
+### A. `getListScript()`
+
+Extracts an array of novels from a search results page or category list.
+
+* **Returns:** Array of Objects `[{ title, url, chapters, cover, source }]`
+
+### B. `getNovelDetailsScript()`
+
+Extracts metadata and the chapter list from a specific novel's homepage.
+
+* **Returns:** Object `{ description, author, lastChapter, firstChapterUrl, allChapters: [{title, url}], cover }`
+
+### C. `getChapterScript()` *(Only required if `mode: 'scrape'`)*
+
+Extracts the text content from a reading page and finds the link to the next chapter.
+
+* **Returns:** Object `{ title, paragraphs: ["text", "text"], nextUrl: "https..." }`
+
+---
+
+## 📄 Full Example (`allnovel.js`)
+
+Here is a complete, working example of a chapter-scraping provider:
+
+```javascript
 module.exports = {
     id: 'allnovel',
     name: 'AllNovel',
     version: '1.1.2',
     icon: 'https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png',
+    mode: 'scrape', 
     
-    // 1. Define available categories for this specific site
     categories: [
         { id: 'hot', name: 'Hot' },
         { id: 'popular', name: 'Most Popular' },
@@ -80,70 +135,85 @@ module.exports = {
         { id: 'completed', name: 'Completed' }
     ],
 
-    // 2. Map category IDs to their specific URLs, supporting pagination
     getCategoryUrl: (categoryId, page = 1) => {
         const baseUrl = 'https://allnovel.org';
         switch (categoryId) {
-            case 'Hot': return `${baseUrl}/hot-novel?page=${page}`;
+            case 'hot': return `${baseUrl}/hot-novel?page=${page}`;
             case 'latest': return `${baseUrl}/latest-release-novel?page=${page}`;
             case 'completed': return `${baseUrl}/completed-novel?page=${page}`;
-            case 'popular': return `${baseUrl}/most-popular?page=${page}`;
-            default: return `${baseUrl}/most-popular?page=${page}`;
+            case 'popular': default: return `${baseUrl}/most-popular?page=${page}`;
         }
     },
 
-    getSearchUrl: (query, page = 1) => `https://allnovel.org/search?keyword=${encodeURIComponent(query).replace(/%20/g, '+')}&page=${page}`,
+    getSearchUrl: (query, page = 1) => 
+        `https://allnovel.org/search?keyword=${encodeURIComponent(query).replace(/%20/g, '+')}&page=${page}`,
 
-    getNovelDetailsScript: () => `
-        (() => {
-            const descEl = document.querySelector('.desc-text, .summary, .description, #description');
-            const description = descEl ? descEl.innerText.trim() : "No description available.";
-            const authorEl = document.querySelector('.author, .info-item a, a[href*="author"]');
-            const author = authorEl ? authorEl.innerText.trim() : "Unknown";
-            const chapterLinks = document.querySelectorAll('ul.list-chapter li a, .chapter-list a, #list-chapter a');
-            const allChapters = Array.from(chapterLinks).map(a => ({ title: a.innerText.trim(), url: a.href }));
-            const lastChText = allChapters.length > 0 ? allChapters[allChapters.length - 1].title : "N/A";
-            const firstChEl = document.querySelector('a.btn-read-now, a[href*="chapter-1"], .read-first');
-            const firstChapterUrl = firstChEl ? firstChEl.href : (allChapters.length > 0 ? allChapters[0].url : window.location.href);
-
-            return {
-                description, author, lastChapter: lastChText, firstChapterUrl,
-                allChapters: allChapters.slice(0, 500)
-            };
-        })();`,
-
-    // 3. Rename to getListScript as it handles both search results and category lists
     getListScript: () => `
         (() => {
             const results = [];
-            const novelRows = document.querySelectorAll('.list-truyen > .row');
-            
-            novelRows.forEach(row => {
+            document.querySelectorAll('.list-truyen > .row').forEach(row => {
                 const titleLink = row.querySelector('.truyen-title a');
                 if (!titleLink) return;
                 
                 const title = titleLink.innerText.trim();
                 let url = titleLink.getAttribute('href');
                 if (url && url.startsWith('/')) url = 'https://allnovel.org' + url;
-                else if (url && !url.startsWith('http')) url = titleLink.href; 
                 
                 const imgEl = row.querySelector('.col-xs-3 img');
-                let cover = null;
-                if (imgEl) {
-                    cover = imgEl.getAttribute('src');
-                    if (cover && cover.startsWith('/')) cover = 'https://allnovel.org' + cover;
-                }
+                let cover = imgEl ? imgEl.getAttribute('src') : null;
+                if (cover && cover.startsWith('/')) cover = 'https://allnovel.org' + cover;
                 
-                let chapters = "View Info";
                 const chapterLink = row.querySelector('.col-xs-2.text-info .chapter-text');
-                if (chapterLink) chapters = chapterLink.innerText.trim();
+                const chapters = chapterLink ? chapterLink.innerText.trim() : "View Info";
                 
                 if (title && url) {
-                    results.push({ title, url, chapters, cover, source: 'AllNovel' });
+                    results.push({ title, url, chapters, cover, sourceId: 'allnovel' });
                 }
             });
             return results;
+        })();`,
+
+    getNovelDetailsScript: () => `
+        (() => {
+            const descEl = document.querySelector('.desc-text, .summary, .description');
+            const authorEl = document.querySelector('.author, .info-item a');
+            
+            const chapterLinks = Array.from(document.querySelectorAll('ul.list-chapter li a'));
+            const allChapters = chapterLinks.map(a => ({ 
+                title: a.innerText.trim(), 
+                url: a.href 
+            }));
+            
+            const firstChEl = document.querySelector('a.btn-read-now, .read-first');
+            const firstChapterUrl = firstChEl ? firstChEl.href : (allChapters[0]?.url || window.location.href);
+
+            return {
+                description: descEl ? descEl.innerText.trim() : "No description available.",
+                author: authorEl ? authorEl.innerText.trim() : "Unknown",
+                lastChapter: allChapters.length > 0 ? allChapters[allChapters.length - 1].title : "N/A",
+                firstChapterUrl: firstChapterUrl,
+                allChapters: allChapters.slice(0, 500)
+            };
+        })();`,
+        
+    getChapterScript: () => `
+        (() => {
+            const title = document.querySelector('.chr-title')?.innerText?.trim();
+            const paragraphs = Array.from(document.querySelectorAll('#chr-content p'))
+                                   .map(p => p.innerText.trim())
+                                   .filter(p => p.length > 0);
+                                   
+            const nextBtn = Array.from(document.querySelectorAll('a')).find(a => 
+                (a.innerText || '').toLowerCase().includes('next') && 
+                a.href.startsWith('http')
+            );
+            
+            return { 
+                title: title || 'Untitled Chapter', 
+                paragraphs, 
+                nextUrl: nextBtn ? nextBtn.href : null 
+            };
         })();`
 };
-```
 
+```
