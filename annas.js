@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.3.0',
+  version: '1.3.1',
   icon: 'https://annas-archive.gl/favicon.ico',
   mode: 'download',
 
@@ -54,5 +54,92 @@ module.exports = {
             };
         })();`,
 
-  getListScript: () => `/* Keep your existing getListScript here */`
+  getListScript: () => `
+    (() => {
+        const results = [];
+        
+        const parseItem = (item) => {
+            const linkEl = item.querySelector('h3 a') || item.querySelector('a');
+            if (!linkEl) return;
+
+            const title = linkEl.innerText.trim();
+            const url = linkEl.href;
+            
+            const metaContainer = item.querySelector('.text-gray-500, .text-xs, .text-sm');
+            const metaText = metaContainer ? metaContainer.innerText : '';
+            
+            // IMPROVED COVER HANDLING
+            let cover = null;
+            
+            // Try multiple ways to get the cover
+            const imgEl = item.querySelector('img');
+            if (imgEl) {
+                // Try data-src first (lazy loading)
+                cover = imgEl.getAttribute('data-src') || 
+                        imgEl.getAttribute('data-lazy-src') || 
+                        imgEl.src;
+                
+                // Clean up the URL
+                if (cover) {
+                    // Handle relative URLs
+                    if (cover.startsWith('//')) {
+                        cover = 'https:' + cover;
+                    } else if (cover.startsWith('/')) {
+                        cover = 'https://annas-archive.gl' + cover;
+                    }
+                    
+                    // Remove size limitations if present
+                    cover = cover.replace(/&w=\d+/, '').replace(/&h=\d+/, '');
+                    
+                    // Anna's Archive sometimes uses placeholder images
+                    if (cover.includes('placeholder') || cover.includes('1x1')) {
+                        // Try to get a better cover from other attributes
+                        const parentDiv = imgEl.closest('div');
+                        if (parentDiv) {
+                            const style = parentDiv.getAttribute('style');
+                            if (style && style.includes('background-image')) {
+                                const match = style.match(/url\\(['"]?([^'"]+)['"]?\\)/);
+                                if (match) cover = match[1];
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // If no cover found, try looking for cover in background images
+            if (!cover || cover.includes('placeholder')) {
+                const coverDiv = item.querySelector('[style*="background-image"]');
+                if (coverDiv) {
+                    const style = coverDiv.getAttribute('style');
+                    const match = style.match(/url\\(['"]?([^'"]+)['"]?\\)/);
+                    if (match) {
+                        cover = match[1];
+                        if (cover.startsWith('/')) {
+                            cover = 'https://annas-archive.gl' + cover;
+                        }
+                    }
+                }
+            }
+
+            results.push({
+                title: title,
+                url: url.startsWith('http') ? url : 'https://annas-archive.gl' + url,
+                chapters: metaText.trim(),
+                cover: cover,
+                sourceId: 'annas'
+            });
+        };
+
+        // Multiple selector strategies
+        document.querySelectorAll('[class*="h-[125px]"], .js-vim-focus, .flex.items-start, article, [data-testid="result-item"]').forEach(parseItem);
+        
+        document.querySelectorAll('a[href*="/md5/"], a[href*="/nexusstc/"], a[href*="/details/"]').forEach(link => {
+            const container = link.closest('div[class*="flex"], div[class*="relative"], article, li');
+            if (container && !results.some(r => r.url === link.href)) {
+                parseItem(container);
+            }
+        });
+
+        return results;
+    })();`,
 };
