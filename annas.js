@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.3.1',
+  version: '1.3.2',
   icon: 'https://annas-archive.gl/favicon.ico',
   mode: 'download',
 
@@ -25,9 +25,17 @@ module.exports = {
 
   getNovelDetailsScript: () => `
         (() => {
-            // Find the "Slow Partner Server" link (this is the intermediate download page)
+            // Find all "Slow Partner Server" links
             const slowLinks = Array.from(document.querySelectorAll('a[href*="/slow_download/"]'));
-            const downloadPageLink = slowLinks.length > 0 ? slowLinks[0].href : null;
+            
+            // Look for the first link where the parent element's text contains "no waitlist"
+            const noWaitlistLink = slowLinks.find(link => {
+                const parentText = link.parentElement ? link.parentElement.textContent.toLowerCase() : '';
+                return parentText.includes('no waitlist');
+            });
+
+            // Set the download link to the "no waitlist" server, or fallback to the first available one
+            const downloadPageLink = noWaitlistLink ? noWaitlistLink.href : (slowLinks.length > 0 ? slowLinks[0].href : null);
 
             // Metadata Extraction
             const titleEl = document.querySelector('.font-semibold.text-2xl');
@@ -49,7 +57,7 @@ module.exports = {
             return {
                 title, description, author, cover,
                 lastChapter: "Full Book", 
-                firstChapterUrl: downloadPageLink, // Passes the intermediate page to the main process
+                firstChapterUrl: downloadPageLink, // Passes the optimal page to the main process
                 allChapters: [] 
             };
         })();`,
