@@ -1,7 +1,7 @@
 module.exports = {
     id: 'readfromnet',
     name: 'ReadFrom.Net',
-    version: '1.2.0',
+    version: '1.3.0',
     icon: 'https://static.readfrom.net//templates/readfromnet/images/logo41.png',
     
     // 1. Define available categories
@@ -31,16 +31,13 @@ module.exports = {
     getChapterScript: () => `
     (() => {
         // 1. Title Selection
-        // Grabs the book title or current page heading
         const titleEl = document.querySelector('h1, h2, .b-title, .chapter-title, .tit, .page-header');
         const title = titleEl ? titleEl.innerText.trim() : 'Untitled Page';
         
         // 2. Content Selection
-        // ReadFrom.Net usually places text inside specific reading containers
         const contentSelectors = ['.book-text p', '#content p', '.page-content p', '.story p', 'article p'];
         let paragraphs = [];
         
-        // Try finding standard <p> tags first
         for (let selector of contentSelectors) {
             const found = Array.from(document.querySelectorAll(selector))
                 .map(p => p.innerText.trim())
@@ -52,36 +49,56 @@ module.exports = {
             }
         }
 
-        // Fallback: If no <p> tags are found, grab text nodes separated by <br> 
-        // inside the most likely main container.
         if (paragraphs.length === 0) {
             const container = document.querySelector('.book-text, #content, .page-content, .story');
             if (container) {
                 paragraphs = Array.from(container.childNodes)
                     .map(node => node.textContent ? node.textContent.trim() : '')
-                    .filter(text => text.length > 5); // Ignore empty lines, whitespace, and short ads
+                    .filter(text => text.length > 5);
             }
         }
 
-        // 3. Next Button Selection
-        // ReadFrom.Net often uses '>>', 'Next', or 'Next Page' for pagination
-        const nextBtn = Array.from(document.querySelectorAll('a')).find(a => {
-            const text = (a.innerText || '').toLowerCase();
-            const href = a.href || '';
-            const absoluteHref = a.href || '';
-            
-            // Match "Next" or ">>" but ensure it's not "Previous", is a real link, and doesn't just reload the page
-            return (text.includes('next') || text.includes('>>') || text.includes('forward')) && 
-                   !text.includes('prev') && 
-                   !text.includes('<<') &&
-                   absoluteHref.startsWith('http') && 
-                   absoluteHref.split('#')[0] !== window.location.href.split('#')[0];
-        });
+        // --- 3. EXACT NEXT URL FINDER ---
+        let nextUrl = null;
+
+        // Strategy A: Target the exact ReadFrom.Net structure you found
+        const exactNextBtn = document.querySelector('.page_next a');
+        if (exactNextBtn && exactNextBtn.href) {
+            nextUrl = exactNextBtn.href;
+        }
+
+        // Strategy B: Aggressive fallback checking parent elements
+        if (!nextUrl) {
+            const nextBtn = Array.from(document.querySelectorAll('a')).find(a => {
+                const text = (a.innerText || a.textContent || '').toLowerCase().trim();
+                const parentClass = (a.parentElement?.className || '').toLowerCase();
+                const parentTitle = (a.parentElement?.getAttribute('title') || '').toLowerCase();
+                const absoluteHref = a.href || '';
+
+                // Must be a valid link pointing somewhere else
+                if (!absoluteHref.startsWith('http') || absoluteHref.split('#')[0] === window.location.href.split('#')[0]) {
+                    return false;
+                }
+
+                // Explicitly exclude "previous" buttons
+                if (text.includes('prev') || parentClass.includes('prev') || parentTitle.includes('prev')) {
+                    return false;
+                }
+
+                // Check text, or check if the parent wrapper indicates it's a "next" button
+                return text.includes('next') || text.includes('>>') || text === '>' ||
+                       parentClass.includes('next') || parentTitle.includes('next');
+            });
+
+            if (nextBtn) {
+                nextUrl = nextBtn.href;
+            }
+        }
 
         return {
             title: title,
             paragraphs: paragraphs,
-            nextUrl: nextBtn ? nextBtn.href : null
+            nextUrl: nextUrl
         };
     })();`,
 
