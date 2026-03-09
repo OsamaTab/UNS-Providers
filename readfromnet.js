@@ -1,7 +1,7 @@
 module.exports = {
     id: 'readfromnet',
     name: 'ReadFrom.Net',
-    version: '1.3.0',
+    version: '1.4.0',
     icon: 'https://static.readfrom.net//templates/readfromnet/images/logo41.png',
     
     // 1. Define available categories
@@ -34,40 +34,54 @@ module.exports = {
         const titleEl = document.querySelector('h1, h2, .b-title, .chapter-title, .tit, .page-header');
         const title = titleEl ? titleEl.innerText.trim() : 'Untitled Page';
         
-        // 2. Content Selection
-        const contentSelectors = ['.book-text p', '#content p', '.page-content p', '.story p', 'article p'];
+        // 2. DOM SANITIZATION (Delete the junk before reading)
+        const junkSelectors = [
+            'script', 'style', 'iframe', 'button', 'select', 'noscript', 
+            '.splitnewsnavigation', '.page_prev', '.page_next', 
+            '[id^="image"]', 'label', 'input', '.ad', '#holder'
+        ];
+        document.querySelectorAll(junkSelectors.join(', ')).forEach(el => el.remove());
+
+        // 3. Content Selection
+        const contentSelectors = ['.book-text', '#content', '.page-content', '.story', 'article'];
         let paragraphs = [];
         
         for (let selector of contentSelectors) {
-            const found = Array.from(document.querySelectorAll(selector))
+            const container = document.querySelector(selector);
+            if (!container) continue;
+
+            // Try standard <p> tags first
+            const pTags = Array.from(container.querySelectorAll('p'))
                 .map(p => p.innerText.trim())
-                .filter(text => text.length > 0);
+                .filter(text => text.length > 0 && !text.includes('CancelReport Ad'));
             
-            if (found.length > 0) {
-                paragraphs = found;
+            if (pTags.length > 0) {
+                paragraphs = pTags;
                 break;
             }
-        }
 
-        if (paragraphs.length === 0) {
-            const container = document.querySelector('.book-text, #content, .page-content, .story');
-            if (container) {
-                paragraphs = Array.from(container.childNodes)
-                    .map(node => node.textContent ? node.textContent.trim() : '')
-                    .filter(text => text.length > 5);
+            // Fallback: Read raw text nodes (for sites that just use <br> tags)
+            // TreeWalker perfectly extracts text without grabbing HTML wrappers
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while ((node = walker.nextNode())) {
+                const text = node.textContent.trim();
+                // Filter out tiny UI strings, ad remnants, and empty lines
+                if (text.length > 15 && !text.includes('Support this site') && !text.includes('CancelReport Ad')) {
+                    paragraphs.push(text);
+                }
             }
+            if (paragraphs.length > 0) break;
         }
 
-        // --- 3. EXACT NEXT URL FINDER ---
+        // --- 4. EXACT NEXT URL FINDER ---
         let nextUrl = null;
 
-        // Strategy A: Target the exact ReadFrom.Net structure you found
         const exactNextBtn = document.querySelector('.page_next a');
         if (exactNextBtn && exactNextBtn.href) {
             nextUrl = exactNextBtn.href;
         }
 
-        // Strategy B: Aggressive fallback checking parent elements
         if (!nextUrl) {
             const nextBtn = Array.from(document.querySelectorAll('a')).find(a => {
                 const text = (a.innerText || a.textContent || '').toLowerCase().trim();
@@ -75,17 +89,14 @@ module.exports = {
                 const parentTitle = (a.parentElement?.getAttribute('title') || '').toLowerCase();
                 const absoluteHref = a.href || '';
 
-                // Must be a valid link pointing somewhere else
                 if (!absoluteHref.startsWith('http') || absoluteHref.split('#')[0] === window.location.href.split('#')[0]) {
                     return false;
                 }
 
-                // Explicitly exclude "previous" buttons
                 if (text.includes('prev') || parentClass.includes('prev') || parentTitle.includes('prev')) {
                     return false;
                 }
 
-                // Check text, or check if the parent wrapper indicates it's a "next" button
                 return text.includes('next') || text.includes('>>') || text === '>' ||
                        parentClass.includes('next') || parentTitle.includes('next');
             });
