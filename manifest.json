@@ -2,9 +2,11 @@
     {
         "id": "app",
         "name": "UNS",
-        "version": "1.5.1",
+        "version": "1.5.2",
         "type": "Core",
-        "icon": ""
+        "icon": "https://universalnovelscraper.com/icon.png",
+        "downloadWin": "https://download.universalnovelscraper.com/huQB2w",
+        "downloadMac": "https://download.universalnovelscraper.com/viVzMp"
     },
     {
         "id": "allnovel",
