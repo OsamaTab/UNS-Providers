@@ -1,5 +1,12 @@
 [
     {
+        "id": "app",
+        "name": "NovelVault",
+        "version": "1.5.1",
+        "type": "Core",
+        "icon": ""
+    },
+    {
         "id": "allnovel",
         "version": "1.1.2",
         "type": "Novels",
@@ -65,5 +72,12 @@
         "version": "1.1.0",
         "type": "Novels",
         "icon": "https://www.royalroad.com/dist/img/logo/rr-logo-gold-white-small-min.png"
+    },
+    {
+        "id": "readsonlinefree",
+        "version": "1.0.1",
+        "type": "Novels",
+        "beta": true,
+        "icon": "https://readsonlinefree.com/theme/01/assets/img/book42.png"
     }
 ]
