@@ -39,7 +39,12 @@ module.exports = {
     // 4. DOM Extraction Scripts (Returned as Strings)
     getListScript: () => `(() => { ... })()`,
     getNovelDetailsScript: () => `(() => { ... })()`,
-    getChapterScript: () => `(() => { ... })()`
+    
+    // Use this if mode is 'scrape'
+    getChapterScript: () => `(() => { ... })()`, 
+    
+    // Use this if mode is 'download'
+    getDownloadUrlScript: () => `(() => { ... })()` 
 };
 
 ```
@@ -56,7 +61,7 @@ Define the identity and behavior of your provider.
 | **`name`** | `String` | The display name shown in the UI. |
 | **`version`** | `String` | Semantic versioning (e.g., `'1.0.0'`). |
 | **`icon`** | `String` | Absolute URL to the site's favicon or logo. |
-| **`mode`** | `String` | **Crucial:** Use `'scrape'` if the app needs to read chapters one by one. Use `'download'` if the site provides direct `.epub`, `.pdf`, or `.mobi` files (like Anna's Archive). |
+| **`mode`** | `String` | **Crucial:** Use `'scrape'` if the app needs to read chapters one by one. Use `'download'` if the site provides direct `.epub`, `.pdf`, or `.mobi` files. |
 | **`beta`** | `Boolean` | *(Optional)* Set to `true` to flag this source as experimental in the UI. |
 
 ---
@@ -100,11 +105,11 @@ getSearchUrl: (query, page = 1) => `https://example.com/search?q=${encodeURIComp
 
 Extracts an array of novels from a search results page or category list.
 
-* **Returns:** Array of Objects `[{ title, url, chapters, cover, source }]`
+* **Returns:** Array of Objects `[{ title, url, chapters, cover, sourceId }]`
 
 ### B. `getNovelDetailsScript()`
 
-Extracts metadata and the chapter list from a specific novel's homepage.
+Extracts metadata and the chapter/download list from a specific novel's homepage.
 
 * **Returns:** Object `{ description, author, lastChapter, firstChapterUrl, allChapters: [{title, url}], cover }`
 
@@ -114,35 +119,34 @@ Extracts the text content from a reading page and finds the link to the next cha
 
 * **Returns:** Object `{ title, paragraphs: ["text", "text"], nextUrl: "https..." }`
 
+### D. `getDownloadUrlScript()` *(Only required if `mode: 'download'`)*
+
+Extracts the final direct file URL (like an `.epub` or `.pdf` link) from the download page. The main app handles navigation and protection bypass (like Cloudflare); this script only needs to locate the link in the DOM.
+
+* **Returns:** String `"https://..."` (The direct download URL) or `null` if not found yet.
+
 ---
 
-## 📄 Full Example (`allnovel.js`)
+## 📄 Full Example: Chapter Scraper (`mode: 'scrape'`)
 
-Here is a complete, working example of a chapter-scraping provider:
+Here is a complete, working example of a provider that scrapes chapter by chapter:
 
 ```javascript
 module.exports = {
     id: 'allnovel',
     name: 'AllNovel',
     version: '1.1.2',
-    icon: 'https://allnovel.org/uploads/thumbs/logo-allnovel-2-1-ad7cde4de9-c5b5412be60c1e2832eda80296241749.png',
+    icon: 'https://allnovel.org/uploads/thumbs/logo.png',
     mode: 'scrape', 
     
     categories: [
         { id: 'hot', name: 'Hot' },
-        { id: 'popular', name: 'Most Popular' },
-        { id: 'latest', name: 'Latest Updates' },
-        { id: 'completed', name: 'Completed' }
+        { id: 'popular', name: 'Most Popular' }
     ],
 
     getCategoryUrl: (categoryId, page = 1) => {
         const baseUrl = 'https://allnovel.org';
-        switch (categoryId) {
-            case 'hot': return `${baseUrl}/hot-novel?page=${page}`;
-            case 'latest': return `${baseUrl}/latest-release-novel?page=${page}`;
-            case 'completed': return `${baseUrl}/completed-novel?page=${page}`;
-            case 'popular': default: return `${baseUrl}/most-popular?page=${page}`;
-        }
+        return categoryId === 'hot' ? `${baseUrl}/hot-novel?page=${page}` : `${baseUrl}/most-popular?page=${page}`;
     },
 
     getSearchUrl: (query, page = 1) => 
@@ -159,40 +163,23 @@ module.exports = {
                 let url = titleLink.getAttribute('href');
                 if (url && url.startsWith('/')) url = 'https://allnovel.org' + url;
                 
-                const imgEl = row.querySelector('.col-xs-3 img');
-                let cover = imgEl ? imgEl.getAttribute('src') : null;
-                if (cover && cover.startsWith('/')) cover = 'https://allnovel.org' + cover;
-                
-                const chapterLink = row.querySelector('.col-xs-2.text-info .chapter-text');
-                const chapters = chapterLink ? chapterLink.innerText.trim() : "View Info";
-                
-                if (title && url) {
-                    results.push({ title, url, chapters, cover, sourceId: 'allnovel' });
-                }
+                results.push({ title, url, sourceId: 'allnovel' });
             });
             return results;
         })();`,
 
     getNovelDetailsScript: () => `
         (() => {
-            const descEl = document.querySelector('.desc-text, .summary, .description');
-            const authorEl = document.querySelector('.author, .info-item a');
-            
+            const descEl = document.querySelector('.desc-text');
+            const authorEl = document.querySelector('.author');
             const chapterLinks = Array.from(document.querySelectorAll('ul.list-chapter li a'));
-            const allChapters = chapterLinks.map(a => ({ 
-                title: a.innerText.trim(), 
-                url: a.href 
-            }));
             
-            const firstChEl = document.querySelector('a.btn-read-now, .read-first');
-            const firstChapterUrl = firstChEl ? firstChEl.href : (allChapters[0]?.url || window.location.href);
-
             return {
                 description: descEl ? descEl.innerText.trim() : "No description available.",
                 author: authorEl ? authorEl.innerText.trim() : "Unknown",
-                lastChapter: allChapters.length > 0 ? allChapters[allChapters.length - 1].title : "N/A",
-                firstChapterUrl: firstChapterUrl,
-                allChapters: allChapters.slice(0, 500)
+                lastChapter: chapterLinks.length > 0 ? chapterLinks[chapterLinks.length - 1].innerText.trim() : "N/A",
+                firstChapterUrl: chapterLinks[0]?.href || window.location.href,
+                allChapters: chapterLinks.map(a => ({ title: a.innerText.trim(), url: a.href }))
             };
         })();`,
         
@@ -204,8 +191,7 @@ module.exports = {
                                    .filter(p => p.length > 0);
                                    
             const nextBtn = Array.from(document.querySelectorAll('a')).find(a => 
-                (a.innerText || '').toLowerCase().includes('next') && 
-                a.href.startsWith('http')
+                (a.innerText || '').toLowerCase().includes('next') && a.href.startsWith('http')
             );
             
             return { 
@@ -213,6 +199,85 @@ module.exports = {
                 paragraphs, 
                 nextUrl: nextBtn ? nextBtn.href : null 
             };
+        })();`
+};
+
+```
+
+---
+
+## 📄 Full Example: Direct File Downloader (`mode: 'download'`)
+
+Here is a working example of a provider that downloads entire files directly, using `getDownloadUrlScript`:
+
+```javascript
+module.exports = {
+  id: 'annas',
+  name: "Anna's Archive",
+  version: '1.3.2',
+  icon: 'https://annas-archive.gl/favicon.ico',
+  mode: 'download',
+
+  categories: [
+    { id: 'recent', name: 'Recent' },
+    { id: 'fiction', name: 'Fiction' }
+  ],
+  
+  getCategoryUrl: (categoryId, page = 1) => {
+        const params = { 'recent': '&sort=newest', 'fiction': '&fiction=1' };
+        return `https://annas-archive.gl/search?index=&page=${page}${params[categoryId] || ''}&q=`;
+  },
+
+  getSearchUrl: (query, page = 1) => `https://annas-archive.gl/search?page=${page}&q=${encodeURIComponent(query)}`,
+
+  getListScript: () => `
+    (() => {
+        const results = [];
+        document.querySelectorAll('[class*="h-[125px]"], .flex.items-start').forEach(item => {
+            const linkEl = item.querySelector('h3 a') || item.querySelector('a');
+            if (!linkEl) return;
+            results.push({
+                title: linkEl.innerText.trim(),
+                url: linkEl.href.startsWith('http') ? linkEl.href : 'https://annas-archive.gl' + linkEl.href,
+                sourceId: 'annas'
+            });
+        });
+        return results;
+    })();`,
+
+  getNovelDetailsScript: () => `
+        (() => {
+            const slowLinks = Array.from(document.querySelectorAll('a[href*="/slow_download/"]'));
+            const downloadPageLink = slowLinks.length > 0 ? slowLinks[0].href : null;
+
+            const titleEl = document.querySelector('.font-semibold.text-2xl');
+            const authorEl = document.querySelector('a[href*="/search?q="] .icon-[mdi--user-edit]');
+
+            return {
+                title: titleEl ? titleEl.innerText.trim() : '',
+                author: authorEl ? authorEl.closest('a').innerText.trim() : 'Unknown',
+                lastChapter: "Full Book", 
+                firstChapterUrl: downloadPageLink, // Passes the download page to the main process
+                allChapters: [] 
+            };
+        })();`,
+
+  getDownloadUrlScript: () => `
+        (() => {
+            // Check for direct text links
+            const span = document.querySelector('span.break-all');
+            if (span && span.innerText.trim().startsWith('http')) {
+                return span.innerText.trim();
+            }
+            
+            // Fallback to checking anchor tags for common file extensions
+            const links = Array.from(document.querySelectorAll('a'));
+            const fileLink = links.find(a => 
+                a.innerText.toLowerCase().includes('download') || 
+                a.href.includes('.epub') || 
+                a.href.includes('.pdf')
+            );
+            return fileLink ? fileLink.href : null;
         })();`
 };
 

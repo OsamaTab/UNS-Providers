@@ -17,7 +17,7 @@
     {
         "id": "annas",
         "name": "Anna's Archive",
-        "version": "1.3.2",
+        "version": "1.3.3",
         "type": "E-Books",
         "mode": "download",
         "beta": true,

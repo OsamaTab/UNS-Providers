@@ -1,7 +1,7 @@
 module.exports = {
   id: 'annas',
   name: "Anna's Archive",
-  version: '1.3.2',
+  version: '1.3.3',
   icon: 'https://annas-archive.gl/favicon.ico',
   mode: 'download',
 
@@ -150,4 +150,23 @@ module.exports = {
 
         return results;
     })();`,
+    
+    getDownloadUrlScript: () => `
+        (() => {
+            // Check for the direct text link
+            const span = document.querySelector('span.break-all');
+            if (span && span.innerText.trim().startsWith('http')) {
+                return span.innerText.trim();
+            }
+            
+            // Fallback to checking anchor tags
+            const links = Array.from(document.querySelectorAll('a'));
+            const fileLink = links.find(a => 
+                a.innerText.toLowerCase().includes('download') || 
+                a.href.includes('.epub') || 
+                a.href.includes('.pdf')
+            );
+            return fileLink ? fileLink.href : null;
+        })();
+  `,
 };
