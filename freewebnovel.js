@@ -1,7 +1,7 @@
 module.exports = {
     id: 'freewebnovel',
     name: 'FreeWebNovel',
-    version: '1.1.1',
+    version: '1.1.2',
     icon: 'https://freewebnovel.com/static/freewebnovel/images/logo.png',
 
     categories: [
@@ -28,28 +28,55 @@ module.exports = {
     },
 
     // NEW: Specialized script for Chapter Content on FreeWebNovel
+    // NEW: Safer script for Chapter Content on FreeWebNovel
     getChapterScript: () => `
     (() => {
         // 1. Title Selection
         const title = document.querySelector('.tit, .chr-title, h1, h2')?.innerText?.trim();
         
-        // 2. Content Selection (Targeting FreeWebNovel's specific container)
+        // 2. Content Selection
         const container = document.querySelector('#article-content, .txt, .inner-chapter');
         let paragraphs = [];
         
         if (container) {
-            // FreeWebNovel often has text nodes separated by <br>. 
-            // ChildNodes captures everything correctly.
-            paragraphs = Array.from(container.childNodes)
-                .map(node => node.textContent.trim())
-                .filter(text => text.length > 5); // Ignore empty lines and ads
+            // STEP A: Remove obvious ad containers and scripts
+            const junkSelectors = [
+                'script', 'style', 'iframe', 
+                '[class*="ad"]', '[id*="ad"]', '.google-auto-placed'
+            ];
+            container.querySelectorAll(junkSelectors.join(',')).forEach(el => el.remove());
+
+            // STEP B: Use innerText to automatically get formatted text with natural newlines
+            const rawText = container.innerText || "";
+
+            // STEP C: Ad Blacklist
+            const adKeywords = [
+                'freewebnovel',
+                'download the app',
+                'read latest chapters',
+                'report chapter',
+                'unsupported browser'
+            ];
+
+            // STEP D: Split by regex newline (safer than string newlines) and filter
+            paragraphs = rawText.split(/\\r?\\n/)
+                .map(line => line.trim())
+                .filter(line => {
+                    // 1. Remove empty lines or tiny artifacts
+                    if (line.length < 2) return false; 
+                    
+                    // 2. Remove blacklisted ad lines
+                    const lowerText = line.toLowerCase();
+                    const isAd = adKeywords.some(keyword => lowerText.includes(keyword));
+                    
+                    return !isAd; 
+                });
         }
 
         // 3. Next Button Selection
         const nextBtn = Array.from(document.querySelectorAll('a')).find(a => {
             const text = (a.innerText || '').toLowerCase();
             const href = a.href || '';
-            // Match "Next" but ensure it's a real link and not "Previous"
             return text.includes('next') && 
                    !text.includes('prev') && 
                    href.startsWith('http') && 
